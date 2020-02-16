@@ -1,0 +1,29 @@
+{
+    "anneal_params": {
+        "annealing_epochs": 1000,
+        "min_factor": 0.2
+    },
+    "optimizer_params": {
+        "weight_decay": 2.0
+    },
+    "dmm_params": {
+        "h_dim": 600,
+        "hidden_dim": 100,
+        "z_dim": 100,
+        "trans_dim": 200
+    },
+    "vrnn_params": {
+        "h_dim": 600,
+        "z_dim": 100
+    },
+    "srnn_params": {
+        "d_dim": 600,
+        "z_dim": 100,
+        "a_dim": 600
+    },
+    "storn_params": {
+        "h_dim": 100,
+        "z_dim": 100,
+        "h_v_dim": 100
+    }
+}
