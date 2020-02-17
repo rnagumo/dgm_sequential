@@ -24,6 +24,7 @@ def data_loop(epoch, loader, model, args, config, train_mode=True):
     # Returned values
     total_loss = 0
     total_len = 0
+    results = []
 
     # Train with mini-batch
     for x, seq_len in tqdm.tqdm(loader):
@@ -42,15 +43,20 @@ def data_loop(epoch, loader, model, args, config, train_mode=True):
 
         # Train / test
         if train_mode:
-            _loss = model.train(data, mask=mask, epoch=epoch,
-                                writer=config["writer"])
+            _loss = model.train(data, mask=mask, epoch=epoch, results=results)
         else:
-            _loss = model.test(data, mask=mask, epoch=epoch,
-                               writer=config["writer"])
+            _loss = model.test(data, mask=mask, epoch=epoch)
 
         # Add training results
         total_loss += _loss * minibatch_size
         total_len += seq_len.sum()
+
+    # Save training log to config
+    if results:
+        results = torch.tensor(results).sum(axis=0)
+        config["annealing_factor"] = results[0]
+        config["cross_entropy"] = results[1]
+        config["kl_divergence"] = results[2]
 
     return total_loss / total_len
 
@@ -137,6 +143,12 @@ def train(args, logger, config):
         writer.add_scalar("Loss/valid_loss", valid_loss.item(), epoch)
         writer.add_scalar("Loss/test_loss", test_loss.item(), epoch)
         writer.add_images("image_from_latent", sample, epoch)
+        writer.add_scalar("Training/annealing_factor",
+                          config["annealing_factor"], epoch)
+        writer.add_scalar("Training/cross_entropy",
+                          config["cross_entropy"], epoch)
+        writer.add_scalar("Training/kl_divergence",
+                          config["kl_divergence"], epoch)
 
         logger.info(f"Train loss = {train_loss.item()}")
         logger.info(f"Valid loss = {valid_loss.item()}")
