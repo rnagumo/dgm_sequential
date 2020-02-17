@@ -80,16 +80,10 @@ class KLAnnealedIterativeLoss(pxl.IterativeLoss):
 
         loss = _ce_loss_sum + annealing_factor * _kl_loss_sum
 
-        if "epoch" in kwargs and "writer" in kwargs:
-            kwargs["writer"].add_scalar(
-                "Iteration/annealing_factor", annealing_factor,
-                kwargs["epoch"])
-            kwargs["writer"].add_scalar(
-                "Iteration/cross_entropy", _ce_loss_sum.mean().item(),
-                kwargs["epoch"])
-            kwargs["writer"].add_scalar(
-                "Iteration/kl_divergence", _kl_loss_sum.mean().item(),
-                kwargs["epoch"])
+        if "results" in kwargs:
+            kwargs["results"].append([
+                annealing_factor, _ce_loss_sum.mean().item(),
+                _kl_loss_sum.mean().item()])
 
         # Restore original values
         x_dict.update(series_x_dict)
