@@ -23,7 +23,6 @@
     },
     "storn_params": {
         "h_dim": 100,
-        "z_dim": 100,
-        "h_v_dim": 100
+        "z_dim": 100
     }
 }
