@@ -7,15 +7,15 @@ http://arxiv.org/abs/1605.07571
 
 import torch
 import torch.utils.data
-from torch import nn, optim
+from torch import nn
 from torch.nn import functional as F
 
 import pixyz.distributions as pxd
 import pixyz.losses as pxl
-import pixyz.models as pxm
 
 from .iteration_loss import KLAnnealedIterativeLoss
 from .time_expectation import TimeSeriesExpectation
+from .base import BaseSequentialModel
 
 
 class ForwardRNN(pxd.Deterministic):
@@ -88,91 +88,84 @@ class VariationalPrior(pxd.Normal):
         return {"scale": scale, "loc": loc}
 
 
-def load_srnn_model(config):
+class SRNN(BaseSequentialModel):
+    def __init__(self, x_dim, d_dim, z_dim, a_dim, t_dim, device, u_dim=None,
+                 anneal_params={}, **kwargs):
 
-    # Input dimension
-    x_dim = config["x_dim"]
-    t_dim = config["t_dim"]
-    device = config["device"]
-    u_dim = x_dim
+        # Input dimension
+        if u_dim is None:
+            u_dim = x_dim
 
-    # Latent dimension
-    d_dim = config["srnn_params"]["d_dim"]
-    z_dim = config["srnn_params"]["z_dim"]
-    a_dim = config["srnn_params"]["a_dim"]
+        self.x_dim = x_dim
+        self.u_dim = u_dim
 
-    # Distributions
-    frnn = ForwardRNN(u_dim, d_dim).to(device)
-    prior = Prior(d_dim, z_dim).to(device)
-    decoder = Generator(z_dim, d_dim, x_dim).to(device)
-    brnn = BackwardRNN(x_dim, d_dim, a_dim).to(device)
-    encoder = VariationalPrior(z_dim, a_dim).to(device)
+        # Latent dimension
+        self.d_dim = d_dim
+        self.z_dim = z_dim
+        self.a_dim = a_dim
 
-    # Loss
-    ce = pxl.CrossEntropy(encoder, decoder)
-    kl = pxl.KullbackLeibler(encoder, prior)
-    _loss = KLAnnealedIterativeLoss(
-        ce, kl, max_iter=t_dim, series_var=["x", "d", "a"],
-        update_value={"z": "z_prev"}, **config["anneal_params"])
+        # Distributions
+        self.frnn = ForwardRNN(u_dim, d_dim).to(device)
+        self.prior = Prior(d_dim, z_dim).to(device)
+        self.decoder = Generator(z_dim, d_dim, x_dim).to(device)
+        self.brnn = BackwardRNN(x_dim, d_dim, a_dim).to(device)
+        self.encoder = VariationalPrior(z_dim, a_dim).to(device)
+        distributions = [self.prior, self.frnn, self.decoder, self.brnn,
+                         self.encoder]
 
-    # Calculate Backward latent a_{1:T} = brnn(d_{1:T})
-    _loss_batch_obs = _loss.expectation(brnn)
+        # Loss
+        ce = pxl.CrossEntropy(self.encoder, self.decoder)
+        kl = pxl.KullbackLeibler(self.encoder, self.prior)
+        _loss = KLAnnealedIterativeLoss(
+            ce, kl, max_iter=t_dim, series_var=["x", "d", "a"],
+            update_value={"z": "z_prev"}, **anneal_params)
 
-    # Calculate Forward latent d_{1:T} = frnn(x_{1:T})
-    _loss_batch = TimeSeriesExpectation(
-        frnn, _loss_batch_obs, series_var=["u"], update_value={"d": "d_prev"})
+        # Calculate Backward latent a_{1:T} = brnn(d_{1:T})
+        _loss_batch_obs = _loss.expectation(self.brnn)
 
-    # Mean for batch
-    loss = _loss_batch.mean()
+        # Calculate Forward latent d_{1:T} = frnn(x_{1:T})
+        _loss_batch = TimeSeriesExpectation(
+            self.frnn, _loss_batch_obs, series_var=["u"],
+            update_value={"d": "d_prev"})
 
-    # Model
-    dmm = pxm.Model(
-        loss, distributions=[prior, frnn, decoder, brnn, encoder],
-        optimizer=optim.Adam,
-        optimizer_params=config["optimizer_params"])
+        # Mean for batch
+        loss = _loss_batch.mean()
 
-    return dmm, (prior, frnn, decoder)
+        super().__init__(device=device, t_dim=t_dim, loss=loss,
+                         distributions=distributions, **kwargs)
 
+    def _init_variable(self, minibatch_size, x=None, **kwargs):
 
-def init_srnn_var(minibatch_size, config, x=None, **kwargs):
+        if x is not None:
+            data = {
+                "z_prev": torch.zeros(
+                    minibatch_size, self.z_dim).to(self.device),
+                "d_prev": torch.zeros(
+                    minibatch_size, self.d_dim).to(self.device),
+                "u": torch.cat(
+                    [torch.zeros(1, minibatch_size, self.x_dim), x[:-1].cpu()]
+                ).to(self.device),
+            }
+        else:
+            data = {
+                "z_prev": torch.zeros(
+                    minibatch_size, self.z_dim).to(self.device),
+                "d_prev": torch.zeros(
+                    minibatch_size, self.d_dim).to(self.device),
+                "u": torch.zeros(
+                    minibatch_size, self.x_dim).to(self.device),
+            }
 
-    if x is not None:
-        data = {
-            "z_prev": torch.zeros(
-                minibatch_size, config["srnn_params"]["z_dim"]
-            ).to(config["device"]),
-            "d_prev": torch.zeros(
-                minibatch_size, config["srnn_params"]["d_dim"]
-            ).to(config["device"]),
-            "u": torch.cat(
-                [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
-            ).to(config["device"]),
-        }
-    else:
-        data = {
-            "z_prev": torch.zeros(
-                minibatch_size, config["srnn_params"]["z_dim"]
-            ).to(config["device"]),
-            "d_prev": torch.zeros(
-                minibatch_size, config["srnn_params"]["d_dim"]
-            ).to(config["device"]),
-            "u": torch.zeros(
-                minibatch_size, config["x_dim"]).to(config["device"]),
-        }
+        return data
 
-    return data
+    def _sample_one_step(self, data, **kwargs):
+        # Sample x_t
+        sample = (self.prior * self.frnn * self.decoder).sample(data)
+        x_t = self.decoder.sample_mean({"z": sample["z"], "d": sample["d"]})
 
+        # Update
+        data["z_prev"] = sample["z"]
+        data["d_prev"] = sample["d"]
+        data["u"] = x_t
 
-def get_srnn_sample(sampler, data):
-    prior, frnn, decoder = sampler
-
-    # Sample x_t
-    sample = (prior * frnn * decoder).sample(data)
-    x_t = decoder.sample_mean({"z": sample["z"], "d": sample["d"]})
-
-    # Update
-    data["z_prev"] = sample["z"]
-    data["d_prev"] = sample["d"]
-    data["u"] = x_t
-
-    return x_t[None, :], data
+        return x_t[None, :], data

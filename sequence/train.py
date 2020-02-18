@@ -9,7 +9,7 @@ from torch.utils import tensorboard
 
 from dataset.polydata import init_poly_dataloader
 from model.dmm import DMM
-from model.srnn import load_srnn_model, init_srnn_var, get_srnn_sample
+from model.srnn import SRNN
 from model.storn import load_storn_model, init_storn_var, get_storn_sample
 from model.vrnn import load_vrnn_model, init_vrnn_var, get_vrnn_sample
 from utils.utils import init_logger, load_config, check_logdir
@@ -60,6 +60,8 @@ def train(args, logger, config):
 
     if args.model == "dmm":
         model = DMM(**config["dmm_params"], **params)
+    elif args.model == "srnn":
+        model = SRNN(**config["srnn_params"], **params)
     else:
         raise KeyError
 
