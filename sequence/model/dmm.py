@@ -4,14 +4,14 @@
 """
 
 import torch
-from torch import nn, optim
+from torch import nn
 from torch.nn import functional as F
 
 import pixyz.distributions as pxd
 import pixyz.losses as pxl
-import pixyz.models as pxm
 
 from .iteration_loss import KLAnnealedIterativeLoss
+from .base import BaseSequentialModel
 
 
 class GatedTrainsitionPrior(pxd.Normal):
@@ -93,61 +93,50 @@ class RNN(pxd.Deterministic):
         return {"h": h[:, :, h.size(2) // 2:]}
 
 
-def load_dmm_model(config):
+class DMM(BaseSequentialModel):
+    def __init__(self, x_dim, h_dim, hidden_dim, z_dim, trans_dim, t_dim,
+                 device, anneal_params={}, **kwargs):
 
-    # Config params
-    x_dim = config["x_dim"]
-    t_dim = config["t_dim"]
-    device = config["device"]
+        # Dimension
+        self.x_dim = x_dim
+        self.h_dim = h_dim
+        self.hidden_dim = hidden_dim
+        self.z_dim = z_dim
+        self.trans_dim = trans_dim
 
-    # Latent dimension
-    h_dim = config["dmm_params"]["h_dim"]
-    hidden_dim = config["dmm_params"]["hidden_dim"]
-    z_dim = config["dmm_params"]["z_dim"]
-    trans_dim = config["dmm_params"]["trans_dim"]
+        # Distributions
+        self.prior = GatedTrainsitionPrior(z_dim, trans_dim).to(device)
+        self.decoder = Generator(z_dim, hidden_dim, x_dim).to(device)
+        self.encoder = Inference(z_dim, h_dim).to(device)
+        self.rnn = RNN(x_dim, h_dim).to(device)
+        distributions = [self.prior, self.decoder, self.encoder, self.rnn]
 
-    # Distributions
-    prior = GatedTrainsitionPrior(z_dim, trans_dim).to(device)
-    decoder = Generator(z_dim, hidden_dim, x_dim).to(device)
-    encoder = Inference(z_dim, h_dim).to(device)
-    rnn = RNN(x_dim, h_dim).to(device)
+        # Loss
+        ce = pxl.CrossEntropy(self.encoder, self.decoder)
+        kl = pxl.KullbackLeibler(self.encoder, self.prior)
+        _loss = KLAnnealedIterativeLoss(
+            ce, kl, max_iter=t_dim, series_var=["x", "h"],
+            update_value={"z": "z_prev"}, **anneal_params)
+        loss = _loss.expectation(self.rnn).mean()
 
-    # Loss
-    ce = pxl.CrossEntropy(encoder, decoder)
-    kl = pxl.KullbackLeibler(encoder, prior)
-    _loss = KLAnnealedIterativeLoss(
-        ce, kl, max_iter=t_dim, series_var=["x", "h"],
-        update_value={"z": "z_prev"}, **config["anneal_params"])
-    loss = _loss.expectation(rnn).mean()
+        super().__init__(device=device, t_dim=t_dim, loss=loss,
+                         distributions=distributions,  **kwargs)
 
-    # Model
-    dmm = pxm.Model(
-        loss, distributions=[rnn, encoder, decoder, prior],
-        optimizer=optim.Adam,
-        optimizer_params=config["optimizer_params"])
+    def _init_variable(self, minibatch_size, **kwargs):
 
-    return dmm, (prior, decoder)
+        data = {
+            "z_prev": torch.zeros(minibatch_size, self.z_dim).to(self.device),
+        }
 
+        return data
 
-def init_dmm_var(minibatch_size, config, **kwargs):
+    def _sample_one_step(self, data, **kwargs):
 
-    data = {
-        "z_prev": torch.zeros(
-            minibatch_size, config["dmm_params"]["z_dim"]
-        ).to(config["device"]),
-    }
+        # Sample x_t
+        sample = (self.prior * self.decoder).sample(data)
+        x_t = self.decoder.sample_mean({"z": sample["z"]})
 
-    return data
+        # Update z_t
+        data["z_prev"] = sample["z"]
 
-
-def get_dmm_sample(sampler, data):
-    prior, decoder = sampler
-
-    # Sample x_t
-    sample = (prior * decoder).sample(data)
-    x_t = decoder.sample_mean({"z": sample["z"]})
-
-    # Update z_t
-    data["z_prev"] = sample["z"]
-
-    return x_t[None, :], data
+        return x_t[None, :], data
