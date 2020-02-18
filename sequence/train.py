@@ -54,11 +54,12 @@ def train(args, logger, config):
     # 3. Model
     # -------------------------------------------------------------------------
 
+    params = {"x_dim": x_dim, "t_dim": t_dim, "device": device,
+              "anneal_params": config["anneal_params"],
+              "optimizer_params": config["optimizer_params"]}
+
     if args.model == "dmm":
-        model = DMM(x_dim=x_dim, t_dim=t_dim, device=device,
-                    **config["dmm_params"],
-                    anneal_params=config["anneal_params"],
-                    optimizer_params=config["optimizer_params"])
+        model = DMM(**config["dmm_params"], **params)
     else:
         raise KeyError
 
