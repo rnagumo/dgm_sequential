@@ -25,11 +25,9 @@ def train(args, logger, config):
     use_cuda = args.cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     torch.manual_seed(args.seed)
-    config["device"] = device
 
     # Tensorboard writer
     writer = tensorboard.SummaryWriter(args.logdir)
-    config["writer"] = writer
 
     # -------------------------------------------------------------------------
     # 2. Data
@@ -48,7 +46,6 @@ def train(args, logger, config):
     # Data dimension (seq_len, batch_size, input_size)
     x_dim = train_loader.dataset.data.size(2)
     t_dim = train_loader.dataset.data.size(0)
-    config.update({"x_dim": x_dim, "t_dim": t_dim})
 
     # -------------------------------------------------------------------------
     # 3. Model
