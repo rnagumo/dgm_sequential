@@ -7,14 +7,14 @@ http://arxiv.org/abs/1411.7610
 
 import torch
 import torch.utils.data
-from torch import nn, optim
+from torch import nn
 from torch.nn import functional as F
 
 import pixyz.distributions as pxd
 import pixyz.losses as pxl
-import pixyz.models as pxm
 
 from .iteration_loss import KLAnnealedIterativeLoss
+from .base import BaseSequentialModel
 
 
 class GeneratorRNN(pxd.Deterministic):
@@ -66,78 +66,70 @@ class Inference(pxd.Normal):
         return {"loc": loc, "scale": scale}
 
 
-def load_storn_model(config):
+class STORN(BaseSequentialModel):
+    def __init__(self, x_dim, h_dim, z_dim, t_dim, device, u_dim=None,
+                 anneal_params={}, **kwargs):
 
-    # Config params
-    x_dim = config["x_dim"]
-    t_dim = config["t_dim"]
-    device = config["device"]
-    u_dim = x_dim
+        # Input dimension
+        if u_dim is None:
+            u_dim = x_dim
 
-    # Latent dimension
-    h_dim = config["storn_params"]["h_dim"]
-    z_dim = config["storn_params"]["z_dim"]
+        self.x_dim = x_dim
+        self.u_dim = u_dim
 
-    # Distributions
-    prior = pxd.Normal(
-        loc=torch.tensor(0.), scale=torch.tensor(1.), var=["z"],
-        features_shape=torch.Size([z_dim])).to(device)
-    grnn = GeneratorRNN(z_dim, u_dim, h_dim).to(device)
-    decoder = Generator(h_dim, x_dim).to(device)
-    irnn = InferenceRNN(x_dim, z_dim).to(device)
-    encoder = Inference().to(device)
+        # Latent dimension
+        self.h_dim = h_dim
+        self.z_dim = z_dim
 
-    # Loss
-    ce = pxl.CrossEntropy(grnn * encoder, decoder)
-    kl = pxl.KullbackLeibler(encoder, prior)
-    _loss = KLAnnealedIterativeLoss(
-        ce, kl, max_iter=t_dim, series_var=["x", "u", "h_v"],
-        update_value={"h": "h_prev"}, **config["anneal_params"])
-    loss = _loss.expectation(irnn).mean()
+        # Distributions
+        self.prior = pxd.Normal(
+            loc=torch.tensor(0.), scale=torch.tensor(1.), var=["z"],
+            features_shape=torch.Size([z_dim])).to(device)
+        self.grnn = GeneratorRNN(z_dim, u_dim, h_dim).to(device)
+        self.decoder = Generator(h_dim, x_dim).to(device)
+        self.irnn = InferenceRNN(x_dim, z_dim).to(device)
+        self.encoder = Inference().to(device)
+        distributions = [self.prior, self.grnn, self.decoder, self.irnn,
+                         self.encoder]
 
-    # Model
-    storn = pxm.Model(
-        loss, distributions=[prior, grnn, decoder, irnn, encoder],
-        optimizer=optim.Adam,
-        optimizer_params=config["optimizer_params"])
+        # Loss
+        ce = pxl.CrossEntropy(self.grnn * self.encoder, self.decoder)
+        kl = pxl.KullbackLeibler(self.encoder, self.prior)
+        _loss = KLAnnealedIterativeLoss(
+            ce, kl, max_iter=t_dim, series_var=["x", "u", "h_v"],
+            update_value={"h": "h_prev"}, **anneal_params)
+        loss = _loss.expectation(self.irnn).mean()
 
-    return storn, (decoder, grnn, prior)
+        super().__init__(device=device, t_dim=t_dim, loss=loss,
+                         distributions=distributions, **kwargs)
 
+    def _init_variable(self, minibatch_size, x=None, **kwargs):
 
-def init_storn_var(minibatch_size, config, x=None, **kwargs):
+        if x is not None:
+            data = {
+                "h_prev": torch.zeros(
+                    minibatch_size, self.h_dim).to(self.device),
+                "u": torch.cat(
+                    [torch.zeros(1, minibatch_size, self.x_dim), x[:-1].cpu()]
+                ).to(self.device),
+            }
+        else:
+            data = {
+                "h_prev": torch.zeros(
+                    minibatch_size, self.h_dim).to(self.device),
+                "u": torch.zeros(
+                    minibatch_size, self.x_dim).to(self.device),
+            }
 
-    if x is not None:
-        data = {
-            "h_prev": torch.zeros(
-                minibatch_size, config["storn_params"]["h_dim"]
-            ).to(config["device"]),
-            "u": torch.cat(
-                [torch.zeros(1, minibatch_size, config["x_dim"]), x[:-1].cpu()]
-            ).to(config["device"]),
-        }
-    else:
-        data = {
-            "h_prev": torch.zeros(
-                minibatch_size, config["storn_params"]["h_dim"]
-            ).to(config["device"]),
-            "u": torch.zeros(
-                minibatch_size, config["x_dim"]).to(config["device"]),
-        }
+        return data
 
-    return data
+    def _sample_one_step(self, data, **kwargs):
+        # Sample x_t
+        sample = (self.decoder * self.grnn * self.prior).sample(data)
+        x_t = self.decoder.sample_mean({"h": sample["h"]})
 
+        # Update h_t
+        data["h_prev"] = sample["h"]
+        data["u"] = x_t
 
-def get_storn_sample(sampler, data):
-
-    # TODO: wrong method
-    decoder, grnn, prior = sampler
-
-    # Sample x_t
-    sample = (decoder * grnn * prior).sample(data)
-    x_t = decoder.sample_mean({"h": sample["h"]})
-
-    # Update h_t
-    data["h_prev"] = sample["h"]
-    data["u"] = x_t
-
-    return x_t[None, :], data
+        return x_t[None, :], data
