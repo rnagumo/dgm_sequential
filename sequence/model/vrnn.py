@@ -7,14 +7,14 @@ http://arxiv.org/abs/1506.02216
 
 import torch
 import torch.utils.data
-from torch import nn, optim
+from torch import nn
 from torch.nn import functional as F
 
 import pixyz.distributions as pxd
 import pixyz.losses as pxl
-import pixyz.models as pxm
 
 from .iteration_loss import KLAnnealedIterativeLoss
+from .base import BaseSequentialModel
 
 
 class Phi_x(nn.Module):
@@ -98,64 +98,57 @@ class Inference(pxd.Normal):
         return {"loc": loc, "scale": scale}
 
 
-def load_vrnn_model(config):
+class VRNN(BaseSequentialModel):
+    def __init__(self, x_dim, h_dim, z_dim, t_dim, device, u_dim=None,
+                 anneal_params={}, **kwargs):
 
-    # Config params
-    x_dim = config["x_dim"]
-    t_dim = config["t_dim"]
-    device = config["device"]
+        # Input dimension
+        self.x_dim = x_dim
 
-    # Latent dimension
-    h_dim = config["vrnn_params"]["h_dim"]
-    z_dim = config["vrnn_params"]["z_dim"]
+        # Latent dimension
+        self.h_dim = h_dim
+        self.z_dim = z_dim
 
-    # Functions
-    f_phi_x = Phi_x(x_dim, h_dim).to(device)
-    f_phi_z = Phi_z(z_dim, h_dim).to(device)
+        # Functions
+        f_phi_x = Phi_x(x_dim, h_dim).to(device)
+        f_phi_z = Phi_z(z_dim, h_dim).to(device)
 
-    # Distributions
-    prior = Prior(h_dim, z_dim).to(device)
-    decoder = Generator(h_dim, z_dim, x_dim, f_phi_z).to(device)
-    encoder = Inference(h_dim, z_dim, f_phi_x).to(device)
-    recurrence = Recurrence(h_dim, f_phi_x, f_phi_z).to(device)
+        # Distributions
+        self.prior = Prior(h_dim, z_dim).to(device)
+        self.decoder = Generator(h_dim, z_dim, x_dim, f_phi_z).to(device)
+        self.encoder = Inference(h_dim, z_dim, f_phi_x).to(device)
+        self.recurrence = Recurrence(h_dim, f_phi_x, f_phi_z).to(device)
+        distributions = [self.encoder, self.decoder, self.prior,
+                         self.recurrence]
 
-    # Loss
-    recon = pxl.StochasticReconstructionLoss(
-        encoder * recurrence, decoder)
-    kl = pxl.KullbackLeibler(encoder, prior)
-    _loss = KLAnnealedIterativeLoss(
-        recon, kl, max_iter=t_dim, series_var=["x"],
-        update_value={"h": "h_prev"}, **config["anneal_params"])
-    loss = _loss.mean()
+        # Loss
+        recon = pxl.StochasticReconstructionLoss(
+            self.encoder * self.recurrence, self.decoder)
+        kl = pxl.KullbackLeibler(self.encoder, self.prior)
+        _loss = KLAnnealedIterativeLoss(
+            recon, kl, max_iter=t_dim, series_var=["x"],
+            update_value={"h": "h_prev"}, **anneal_params)
+        loss = _loss.mean()
 
-    # Model
-    vrnn = pxm.Model(
-        loss, distributions=[encoder, decoder, prior, recurrence],
-        optimizer=optim.Adam,
-        optimizer_params=config["optimizer_params"])
+        super().__init__(device=device, t_dim=t_dim, loss=loss,
+                         distributions=distributions, **kwargs)
 
-    return vrnn, (prior, recurrence, decoder)
+    def _init_variable(self, minibatch_size, **kwargs):
 
+        data = {
+            "h_prev": torch.zeros(minibatch_size, self.h_dim).to(self.device),
+        }
 
-def init_vrnn_var(minibatch_size, config, **kwargs):
+        return data
 
-    data = {
-        "h_prev": torch.zeros(
-            minibatch_size, config["vrnn_params"]["h_dim"]
-        ).to(config["device"]),
-    }
+    def _sample_one_step(self, data, **kwargs):
 
-    return data
+        # Sample x_t
+        sample = (self.prior * self.decoder * self.recurrence).sample(data)
+        x_t = self.decoder.sample_mean(
+            {"z": sample["z"], "h_prev": sample["h"]})
 
+        # Update h_t
+        data["h_prev"] = sample["h"]
 
-def get_vrnn_sample(sampler, data):
-    prior, recurrence, decoder = sampler
-
-    # Sample x_t
-    sample = (prior * decoder * recurrence).sample(data)
-    x_t = decoder.sample_mean({"z": sample["z"], "h_prev": sample["h"]})
-
-    # Update h_t
-    data["h_prev"] = sample["h"]
-
-    return x_t[None, :], data
+        return x_t[None, :], data
