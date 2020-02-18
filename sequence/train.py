@@ -24,6 +24,9 @@ def train(args, logger, config):
     # Settings
     use_cuda = args.cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
+    logger.info(f"Device: {device}")
+
+    # Random seed
     torch.manual_seed(args.seed)
 
     # Tensorboard writer
