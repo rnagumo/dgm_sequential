@@ -42,13 +42,14 @@ def train(args, logger, config):
     train_loader, valid_loader, test_loader = init_poly_dataloader(
         path, use_cuda, batch_size)
 
-    logger.info(f"Train data size: {train_loader.dataset.data.size()}")
-    logger.info(f"Valid data size: {valid_loader.dataset.data.size()}")
-    logger.info(f"Test data size: {test_loader.dataset.data.size()}")
-
     # Data dimension (seq_len, batch_size, input_size)
     x_dim = train_loader.dataset.data.size(2)
     t_dim = train_loader.dataset.data.size(0)
+
+    # Log
+    logger.info(f"Train data size: {train_loader.dataset.data.size()}")
+    logger.info(f"Valid data size: {valid_loader.dataset.data.size()}")
+    logger.info(f"Test data size: {test_loader.dataset.data.size()}")
 
     # -------------------------------------------------------------------------
     # 3. Model
