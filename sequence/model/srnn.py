@@ -134,17 +134,17 @@ class SRNN(BaseSequentialModel):
         super().__init__(device=device, t_dim=t_dim, loss=loss,
                          distributions=distributions, **kwargs)
 
-    def _init_variable(self, minibatch_size, x=None, **kwargs):
+    def _init_variable(self, minibatch_size, **kwargs):
 
-        if x is not None:
+        if "x" in kwargs:
             data = {
                 "z_prev": torch.zeros(
                     minibatch_size, self.z_dim).to(self.device),
                 "d_prev": torch.zeros(
                     minibatch_size, self.d_dim).to(self.device),
                 "u": torch.cat(
-                    [torch.zeros(1, minibatch_size, self.x_dim), x[:-1].cpu()]
-                ).to(self.device),
+                    [torch.zeros(1, minibatch_size, self.x_dim),
+                     kwargs["x"][:-1].cpu()]).to(self.device),
             }
         else:
             data = {
