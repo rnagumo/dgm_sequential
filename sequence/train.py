@@ -21,7 +21,7 @@ def train(args, logger, config):
     # 1. Settings
     # -------------------------------------------------------------------------
 
-    # Settings
+    # CUDA setting
     use_cuda = args.cuda and torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
     logger.info(f"Device: {device}")
@@ -123,7 +123,6 @@ def init_args():
     parser.add_argument("--filename", type=str, default="JSB_Chorales.pickle")
     parser.add_argument("--config", type=str, default="./config.json")
     parser.add_argument("--model", type=str, default="dmm")
-    parser.add_argument("--test", action="store_true")
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=20)
