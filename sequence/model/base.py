@@ -53,9 +53,9 @@ class BaseSequentialModel(pxm.Model):
 
         if results:
             results = torch.tensor(results).sum(axis=0)
-            loss_dict["annealing_factor"] = results[0]
-            loss_dict["cross_entropy"] = results[1]
-            loss_dict["kl_divergence"] = results[2]
+            loss_dict["annealing_factor"] = results[0] / len(loader)
+            loss_dict["cross_entropy"] = results[1] / total_len
+            loss_dict["kl_divergence"] = results[2] / total_len
 
         return loss_dict
 

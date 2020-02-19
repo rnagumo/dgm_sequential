@@ -82,20 +82,21 @@ def train(args, logger, config):
         valid_loss = model.run(valid_loader, epoch, training=False)
         test_loss = model.run(test_loader, epoch, training=False)
 
-        # Sample data
-        sample = model.sample()
-
         # Log
         writer.add_scalar("loss/train_loss", train_loss["loss"], epoch)
         writer.add_scalar("loss/valid_loss", valid_loss["loss"], epoch)
         writer.add_scalar("loss/test_loss", test_loss["loss"], epoch)
-        writer.add_images("image_from_latent", sample, epoch)
         writer.add_scalar("training/annealing_factor",
                           train_loss["annealing_factor"], epoch)
         writer.add_scalar("training/cross_entropy",
                           train_loss["cross_entropy"], epoch)
         writer.add_scalar("training/kl_divergence",
                           train_loss["kl_divergence"], epoch)
+
+        # Sample data
+        if epoch % args.plot_interval == 0:
+            sample = model.sample()
+            writer.add_images("image_from_latent", sample, epoch)
 
         logger.info(f"Train loss = {train_loss['loss']}")
         logger.info(f"Valid loss = {valid_loss['loss']}")
@@ -127,6 +128,7 @@ def init_args():
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--epochs", type=int, default=5)
+    parser.add_argument("--plot-interval", type=int, default=100)
 
     return parser.parse_args()
 

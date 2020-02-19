@@ -82,8 +82,8 @@ class KLAnnealedIterativeLoss(pxl.IterativeLoss):
 
         if "results" in kwargs:
             kwargs["results"].append([
-                annealing_factor, _ce_loss_sum.mean().item(),
-                _kl_loss_sum.mean().item()])
+                annealing_factor, _ce_loss_sum.sum().item(),
+                _kl_loss_sum.sum().item()])
 
         # Restore original values
         x_dict.update(series_x_dict)
