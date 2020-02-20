@@ -23,7 +23,7 @@ def train(args, logger, config):
 
     # CUDA setting
     use_cuda = args.cuda and torch.cuda.is_available()
-    device = torch.device("cuda" if use_cuda else "cpu")
+    device = torch.device(f"cuda:{args.cuda_num}" if use_cuda else "cpu")
     logger.info(f"Device: {device}")
 
     # Random seed
@@ -125,6 +125,7 @@ def init_args():
     parser.add_argument("--config", type=str, default="./config.json")
     parser.add_argument("--model", type=str, default="dmm")
     parser.add_argument("--cuda", action="store_true")
+    parser.add_argument("--cuda-num", type=int, default=0)
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--epochs", type=int, default=5)
