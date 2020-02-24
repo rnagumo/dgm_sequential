@@ -10,7 +10,7 @@ from torch.nn import functional as F
 import pixyz.distributions as pxd
 import pixyz.losses as pxl
 
-from .iteration_loss import KLAnnealedIterativeLoss
+from .iteration_loss import MonitoredIterativeLoss
 from .base import BaseSequentialModel
 
 
@@ -114,13 +114,15 @@ class DMM(BaseSequentialModel):
         # Loss
         ce = pxl.CrossEntropy(self.encoder, self.decoder)
         kl = pxl.KullbackLeibler(self.encoder, self.prior)
-        _loss = KLAnnealedIterativeLoss(
-            ce, kl, max_iter=t_dim, series_var=["x", "h"],
-            update_value={"z": "z_prev"}, **anneal_params)
+        beta = pxl.Parameter("beta")
+        _loss = MonitoredIterativeLoss(
+            ce, kl, beta, max_iter=t_dim, series_var=["x", "h"],
+            update_value={"z": "z_prev"})
         loss = _loss.expectation(self.rnn).mean()
 
         super().__init__(device=device, t_dim=t_dim, loss=loss,
-                         distributions=distributions,  **kwargs)
+                         distributions=distributions, **anneal_params,
+                         **kwargs)
 
     def _init_variable(self, minibatch_size, **kwargs):
 
