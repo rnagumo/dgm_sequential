@@ -5,18 +5,15 @@ import pixyz.losses as pxl
 import pixyz.utils as pxu
 
 
-class KLAnnealedIterativeLoss(pxl.IterativeLoss):
-    """Iterative loss with KL annealing"""
+class MonitoredIterativeLoss(pxl.IterativeLoss):
+    """Iterative loss with monitoring CE and KL"""
 
-    def __init__(self, cross_entropy, kl_divergence, annealing_epochs,
-                 min_factor, max_factor=1, **kwargs):
-        super().__init__(cross_entropy + kl_divergence, **kwargs)
+    def __init__(self, cross_entropy, kl_divergence, beta, **kwargs):
+        super().__init__(cross_entropy + beta * kl_divergence, **kwargs)
 
         self.cross_entropy = cross_entropy
         self.kl_divergence = kl_divergence
-        self.annealing_epochs = annealing_epochs
-        self.min_factor = min_factor
-        self.max_factor = max_factor
+        self.beta = beta
 
     @property
     def _symbol(self):
@@ -39,14 +36,6 @@ class KLAnnealedIterativeLoss(pxl.IterativeLoss):
             mask = kwargs["mask"].float()
         else:
             mask = None
-
-        # KL annealing factor
-        if "epoch" in kwargs and kwargs["epoch"] < self.annealing_epochs:
-            annealing_factor = (self.min_factor
-                                + (self.max_factor - self.min_factor)
-                                * kwargs["epoch"] / self.annealing_epochs)
-        else:
-            annealing_factor = 1.0
 
         _ce_loss_sum = 0
         _kl_loss_sum = 0
@@ -78,12 +67,12 @@ class KLAnnealedIterativeLoss(pxl.IterativeLoss):
             for key, value in self.update_value.items():
                 x_dict.update({value: x_dict[key]})
 
-        loss = _ce_loss_sum + annealing_factor * _kl_loss_sum
+        beta = self.beta.eval(x_dict)
+        loss = _ce_loss_sum + beta * _kl_loss_sum
 
         if "results" in kwargs:
-            kwargs["results"].append([
-                annealing_factor, _ce_loss_sum.sum().item(),
-                _kl_loss_sum.sum().item()])
+            kwargs["results"].append([_ce_loss_sum.sum().item(),
+                                      _kl_loss_sum.sum().item()])
 
         # Restore original values
         x_dict.update(series_x_dict)

@@ -1,6 +1,6 @@
 {
     "anneal_params": {
-        "annealing_epochs": 1000,
+        "anneal_epochs": 1000,
         "min_factor": 0.2
     },
     "optimizer_params": {

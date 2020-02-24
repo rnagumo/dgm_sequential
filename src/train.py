@@ -86,8 +86,8 @@ def train(args, logger, config):
         writer.add_scalar("loss/train_loss", train_loss["loss"], epoch)
         writer.add_scalar("loss/valid_loss", valid_loss["loss"], epoch)
         writer.add_scalar("loss/test_loss", test_loss["loss"], epoch)
-        writer.add_scalar("training/annealing_factor",
-                          train_loss["annealing_factor"], epoch)
+        writer.add_scalar("training/beta",
+                          train_loss["beta"], epoch)
         writer.add_scalar("training/cross_entropy",
                           train_loss["cross_entropy"], epoch)
         writer.add_scalar("training/kl_divergence",

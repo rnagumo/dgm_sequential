@@ -9,13 +9,26 @@ import pixyz.models as pxm
 
 
 class BaseSequentialModel(pxm.Model):
-    def __init__(self, device, t_dim, **kwargs):
+    def __init__(self, device, t_dim, anneal_epochs, min_factor,
+                 max_factor=1, **kwargs):
         super().__init__(**kwargs)
 
         self.device = device
         self.t_dim = t_dim
 
+        # KL annealing parameters
+        self.anneal_epochs = anneal_epochs
+        self.min_factor = min_factor
+        self.max_factor = max_factor
+
     def run(self, loader, epoch, training=True):
+
+        # Calculate KL annealing factor
+        if epoch < self.anneal_epochs:
+            beta = (self.min_factor + (self.max_factor - self.min_factor)
+                    * epoch / self.anneal_epochs)
+        else:
+            beta = 1.0
 
         # Returned values
         total_loss = 0
@@ -29,7 +42,7 @@ class BaseSequentialModel(pxm.Model):
             minibatch_size = x.size(1)
 
             # Prepare data
-            data = {"x": x}
+            data = {"x": x, "beta": beta}
             data.update(self._init_variable(minibatch_size, x=x))
 
             # Mask for sequencial data
@@ -39,10 +52,9 @@ class BaseSequentialModel(pxm.Model):
 
             # Train / test
             if training:
-                _loss = super().train(data, mask=mask, epoch=epoch,
-                                      results=results)
+                _loss = super().train(data, mask=mask, results=results)
             else:
-                _loss = super().test(data, mask=mask, epoch=epoch)
+                _loss = super().test(data, mask=mask)
 
             # Add training results
             total_loss += _loss * minibatch_size
@@ -53,9 +65,9 @@ class BaseSequentialModel(pxm.Model):
 
         if results:
             results = torch.tensor(results).sum(axis=0)
-            loss_dict["annealing_factor"] = results[0] / len(loader)
-            loss_dict["cross_entropy"] = results[1] / total_len
-            loss_dict["kl_divergence"] = results[2] / total_len
+            loss_dict["beta"] = beta
+            loss_dict["cross_entropy"] = results[0] / total_len
+            loss_dict["kl_divergence"] = results[1] / total_len
 
         return loss_dict
 
