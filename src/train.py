@@ -107,9 +107,9 @@ def train(args, logger, config):
     hparam_dict.update(config["anneal_params"])
     hparam_dict.update(config["optimizer_params"])
     hparam_dict.update(config[f"{args.model}_params"])
-    metric_dict = {"train_loss": train_loss["loss"],
-                   "valid_loss": valid_loss["loss"],
-                   "test_loss": test_loss["loss"]}
+    metric_dict = {"summary/train_loss": train_loss["loss"],
+                   "summary/valid_loss": valid_loss["loss"],
+                   "summary/test_loss": test_loss["loss"]}
     writer.add_hparams(hparam_dict, metric_dict)
 
     writer.close()
