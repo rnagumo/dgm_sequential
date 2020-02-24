@@ -26,16 +26,16 @@ class BaseSequentialModel(pxm.Model):
         for x, seq_len in tqdm.tqdm(loader):
             # Input dimension must be (timestep_size, batch_size, feature_size)
             x = x.transpose(0, 1).to(self.device)
-            data = {"x": x}
             minibatch_size = x.size(1)
+
+            # Prepare data
+            data = {"x": x}
+            data.update(self._init_variable(minibatch_size, x=x))
 
             # Mask for sequencial data
             mask = torch.zeros(x.size(0), x.size(1)).to(self.device)
             for i, v in enumerate(seq_len):
                 mask[:v, i] += 1
-
-            # Initialize latent variable
-            data.update(self._init_variable(minibatch_size, x=x))
 
             # Train / test
             if training:
