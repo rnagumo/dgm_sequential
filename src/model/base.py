@@ -52,9 +52,9 @@ class BaseSequentialModel(pxm.Model):
 
             # Train / test
             if training:
-                _loss = super().train(data, mask=mask, results=results)
+                _loss = self.train(data, mask=mask, results=results)
             else:
-                _loss = super().test(data, mask=mask)
+                _loss = self.test(data, mask=mask)
 
             # Add training results
             total_loss += _loss * minibatch_size
