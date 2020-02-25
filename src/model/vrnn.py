@@ -1,5 +1,5 @@
 
-"""VRNN
+"""VRNN (Variational RNN)
 
 A recurrent latent variable model for sequential data
 http://arxiv.org/abs/1506.02216

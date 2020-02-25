@@ -1,5 +1,5 @@
 
-"""STORN (Stochastic RNN)
+"""STORN (Stochastic Recurrent Network)
 
 Learning Stochastic Recurrent Networks
 http://arxiv.org/abs/1411.7610

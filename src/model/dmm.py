@@ -1,5 +1,5 @@
 
-"""Deep Markov Model
+"""DMM (Deep Markov Model)
 
 Structured Inference Networks for Nonlinear State Space Models
 http://arxiv.org/abs/1609.09869

@@ -1,5 +1,5 @@
 
-"""Stochastic RNN
+"""SRNN (Stochastic RNN)
 
 Sequential Neural Models with Stochastic Layers
 http://arxiv.org/abs/1605.07571
