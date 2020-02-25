@@ -61,11 +61,11 @@ class BaseSequentialModel(pxm.Model):
             total_len += seq_len.sum()
 
         # Return value
-        loss_dict = {"loss": (total_loss / total_len).item()}
+        loss_dict = {"loss": total_loss.item() / total_len, "beta": beta}
 
+        # Add monitored values
         if results:
             results = torch.tensor(results).sum(axis=0)
-            loss_dict["beta"] = beta
             loss_dict["cross_entropy"] = results[0] / total_len
             loss_dict["kl_divergence"] = results[1] / total_len
 
