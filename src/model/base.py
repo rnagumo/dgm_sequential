@@ -10,7 +10,7 @@ import pixyz.models as pxm
 
 class BaseSequentialModel(pxm.Model):
     def __init__(self, device, t_dim, anneal_epochs, min_factor,
-                 max_factor=1, **kwargs):
+                 max_factor=1.0, **kwargs):
         super().__init__(**kwargs)
 
         self.device = device
@@ -28,7 +28,7 @@ class BaseSequentialModel(pxm.Model):
             beta = (self.min_factor + (self.max_factor - self.min_factor)
                     * epoch / self.anneal_epochs)
         else:
-            beta = 1.0
+            beta = self.max_factor
 
         # Returned values
         total_loss = 0
