@@ -119,7 +119,7 @@ def init_args():
     parser = argparse.ArgumentParser(description="Polyphonic data training")
 
     # Direcotry settings
-    parser.add_argument("--logdir", type=str, default="../logs/seq/tmp/")
+    parser.add_argument("--logdir", type=str, default="../logs/tmp/")
     parser.add_argument("--root", type=str, default="../data/poly/")
     parser.add_argument("--filename", type=str, default="JSB_Chorales.pickle")
     parser.add_argument("--config", type=str, default="./config.json")
