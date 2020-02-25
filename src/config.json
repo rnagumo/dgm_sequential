@@ -24,5 +24,11 @@
     "storn_params": {
         "h_dim": 100,
         "z_dim": 100
+    },
+    "tdvae_params": {
+        "z_dim": 8,
+        "h_dim": 50,
+        "b_dim": 50,
+        "rnn_dim": 88
     }
 }

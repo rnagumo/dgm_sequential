@@ -67,6 +67,9 @@ def train(args, logger, config):
     elif args.model == "vrnn":
         from model.vrnn import VRNN
         model = VRNN(**config["vrnn_params"], **params)
+    elif args.model == "tdvae":
+        from model.tdvae import TDVAE
+        model = TDVAE(**config["tdvae_params"], **params)
     else:
         raise KeyError
 
