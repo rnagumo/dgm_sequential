@@ -61,7 +61,7 @@ class BaseSequentialModel(pxm.Model):
             total_len += seq_len.sum()
 
         # Return value
-        loss_dict = {"loss": total_loss.item() / total_len, "beta": beta}
+        loss_dict = {"loss": (total_loss / total_len).item(), "beta": beta}
 
         # Add monitored values
         if results:
