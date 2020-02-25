@@ -8,10 +8,6 @@ import torch
 from torch.utils import tensorboard
 
 from dataset.polydata import init_poly_dataloader
-from model.dmm import DMM
-from model.srnn import SRNN
-from model.storn import STORN
-from model.vrnn import VRNN
 from utils.utils import init_logger, load_config, check_logdir
 
 
@@ -60,12 +56,16 @@ def train(args, logger, config):
               "optimizer_params": config["optimizer_params"]}
 
     if args.model == "dmm":
+        from model.dmm import DMM
         model = DMM(**config["dmm_params"], **params)
     elif args.model == "srnn":
+        from model.srnn import SRNN
         model = SRNN(**config["srnn_params"], **params)
     elif args.model == "storn":
+        from model.storn import STORN
         model = STORN(**config["storn_params"], **params)
     elif args.model == "vrnn":
+        from model.vrnn import VRNN
         model = VRNN(**config["vrnn_params"], **params)
     else:
         raise KeyError
