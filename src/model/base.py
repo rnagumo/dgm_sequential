@@ -78,7 +78,10 @@ class BaseSequentialModel(pxm.Model):
 
         x = []
         with torch.no_grad():
-            for _ in range(self.t_dim):
+            for t in range(self.t_dim):
+                # Update t
+                data.update({"t": t})
+
                 # Sample
                 x_t, data = self._sample_one_step(data)
 
