@@ -1,5 +1,5 @@
 
-""""Iterative loss with KL annealing"""
+""""Iterative loss with monitoring CE and KL"""
 
 import pixyz.losses as pxl
 import pixyz.utils as pxu
@@ -28,7 +28,7 @@ class MonitoredIterativeLoss(pxl.IterativeLoss):
         updated_x_dict = pxu.get_dict_values(x_dict, list(
             self.update_value.values()), return_dict=True)
 
-        # set max_iter
+        # Set max_iter
         if self.max_iter:
             max_iter = self.max_iter
         else:
@@ -49,7 +49,7 @@ class MonitoredIterativeLoss(pxl.IterativeLoss):
                 x_dict.update({self.timestep_var[0]: t})
                 x_dict = self.slice_step.sample(x_dict)
             else:
-                # update series inputs & use slice_step_fn
+                # Update series inputs & use slice_step_fn
                 x_dict.update(self.slice_step_fn(t, series_x_dict))
 
             # If p exists, sample variable from p
