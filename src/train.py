@@ -129,7 +129,7 @@ def init_args():
     parser.add_argument("--model", type=str, default="dmm")
     parser.add_argument("--cuda", action="store_true")
     parser.add_argument("--cuda-num", type=int, default=0)
-    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--plot-interval", type=int, default=100)
