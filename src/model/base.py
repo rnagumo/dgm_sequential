@@ -72,6 +72,7 @@ class BaseSequentialModel(pxm.Model):
         return loss_dict
 
     def sample(self):
+        """Sample data from initial latent variable."""
 
         # Get initial values
         data = self._init_variable(1)
@@ -93,6 +94,14 @@ class BaseSequentialModel(pxm.Model):
 
         # Return data of size (1, batch_size, seq_len, input_size)
         return x[:, None]
+
+    def reconstruction(self, x):
+        """Inference latent variable, and reconstruct observable."""
+        raise NotImplementedError
+
+    def predict(self, x):
+        """Predict latent and observable at future time step."""
+        raise NotImplementedError
 
     def _init_variable(self, minibatch_size, **kwargs):
         raise NotImplementedError
