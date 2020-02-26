@@ -98,8 +98,9 @@ def train(args, logger, config):
 
         # Sample data
         if epoch % args.plot_interval == 0:
-            sample = model.sample()
-            writer.add_images("image_from_latent", sample, epoch)
+            x_sample, z_sample = model.sample()
+            writer.add_images("sample/latent", z_sample, epoch)
+            writer.add_images("sample/observable", x_sample, epoch)
 
         logger.info(f"Train loss = {train_loss['loss']}")
         logger.info(f"Valid loss = {valid_loss['loss']}")

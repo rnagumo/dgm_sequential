@@ -78,22 +78,25 @@ class BaseSequentialModel(pxm.Model):
         data = self._init_variable(1)
 
         x = []
+        z = []
         with torch.no_grad():
             for t in range(self.t_dim):
                 # Update t
                 data.update({"t": t})
 
                 # Sample
-                x_t, data = self._sample_one_step(data)
+                x_t, z_t, data = self._sample_one_step(data)
 
                 # Add to data list
                 x.append(x_t)
+                z.append(z_t)
 
             # Data of size (batch_size, seq_len, input_size)
             x = torch.cat(x).transpose(0, 1)
+            z = torch.cat(z).transpose(0, 1)
 
-        # Return data of size (batch_size, 1, seq_len, input_size)
-        return x[:, None]
+        # Return data of size (batch_size, channel=1, seq_len, input_size)
+        return x[:, None], z[:, None]
 
     def reconstruction(self, x):
         """Inference latent variable, and reconstruct observable."""
