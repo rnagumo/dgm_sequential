@@ -136,11 +136,12 @@ class DMM(BaseSequentialModel):
 
     def _sample_one_step(self, data, **kwargs):
 
-        # Sample x_t
-        sample = (self.prior * self.decoder).sample(data)
-        x_t = self.decoder.sample_mean({"z": sample["z"]})
+        # Sample z_t and x_t
+        sample = self.prior.sample(data)
+        z_t = sample["z"]
+        x_t = self.decoder.sample_mean({"z": z_t})
 
         # Update z_t
-        data["z_prev"] = sample["z"]
+        data["z_prev"] = z_t
 
-        return x_t[None, :], data
+        return x_t[None, :], z_t[None, :], data
