@@ -92,7 +92,7 @@ class BaseSequentialModel(pxm.Model):
             # Data of size (batch_size, seq_len, input_size)
             x = torch.cat(x).transpose(0, 1)
 
-        # Return data of size (1, batch_size, seq_len, input_size)
+        # Return data of size (batch_size, 1, seq_len, input_size)
         return x[:, None]
 
     def reconstruction(self, x):
