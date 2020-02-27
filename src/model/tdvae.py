@@ -146,8 +146,8 @@ class TDVAE(BaseSequentialModel):
         loss = _loss.expectation(self.belief_net).mean()
 
         super().__init__(device=device, t_dim=t_dim - 1, loss=loss,
-                         distributions=distributions, **anneal_params,
-                         **kwargs)
+                         distributions=distributions, series_var=["x", "b"],
+                         **anneal_params, **kwargs)
 
     def _init_variable(self, minibatch_size, **kwargs):
 
@@ -163,10 +163,35 @@ class TDVAE(BaseSequentialModel):
 
     def _sample_one_step(self, data, **kwargs):
         # Sample x_t
-        sample = (self.p_g * self.p_t).sample(data)
+        sample = self.p_t.sample(data)
         x_t = self.p_g.sample_mean({"z_t2": sample["z_t2"]})
 
         # Update z_t
-        data["z_t1"] = sample["z_t2"]
+        z_t = sample["z_t2"]
+        data["z_t1"] = z_t
 
-        return x_t[None, :], data
+        return x_t[None, :], z_t[None, :], data
+
+    def _inference_batch(self, data, **kwargs):
+
+        return self.belief_net.sample(data)
+
+    def _reconstruct_one_step(self, data, **kwargs):
+
+        # Sample latent from encoder, and reconstruct observable from decoder
+        sample = (self.p_t * self.p_b1 * self.slice_step).sample(data)
+        x_t = self.p_g.sample_mean({"z_t2": sample["z_t2"]})
+
+        # Update z_t
+        z_t = sample["z_t2"]
+        data["z_t1"] = z_t
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _extract_latest(self, data, **kwargs):
+
+        res_dict = {
+            "z_t1": data["z_t1"]
+        }
+
+        return res_dict
