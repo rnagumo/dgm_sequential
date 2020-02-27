@@ -1,7 +1,8 @@
 {
     "anneal_params": {
         "anneal_epochs": 1000,
-        "min_factor": 0.2
+        "min_factor": 0.2,
+        "max_factor": 1.0
     },
     "optimizer_params": {
         "weight_decay": 2.0
