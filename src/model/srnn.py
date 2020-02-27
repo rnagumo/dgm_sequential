@@ -12,6 +12,7 @@ from torch.nn import functional as F
 
 import pixyz.distributions as pxd
 import pixyz.losses as pxl
+import pixyz.utils as pxu
 
 from .iteration_loss import MonitoredIterativeLoss
 from .time_expectation import TimeSeriesExpectation
@@ -133,6 +134,7 @@ class SRNN(BaseSequentialModel):
         loss = _loss_batch.mean()
 
         super().__init__(device=device, t_dim=t_dim, loss=loss,
+                         series_var=["x", "d", "a"],
                          distributions=distributions, **anneal_params,
                          **kwargs)
 
@@ -170,4 +172,75 @@ class SRNN(BaseSequentialModel):
         data["d_prev"] = sample["d"]
         data["u"] = x_t
 
-        return x_t[None, :], data
+        # z_t
+        z_t = sample["z"]
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _inference_batch(self, data, **kwargs):
+
+        series_var = ["u"]
+        update_value = {"d": "d_prev"}
+
+        # Extract original values
+        series_dict = pxu.get_dict_values(
+            data, series_var, return_dict=True)
+        updated_dict = pxu.get_dict_values(
+            data, list(update_value.values()), return_dict=True)
+
+        # Sampled values
+        sample_dict = {k: [] for k in update_value}
+
+        # Time series iteration
+        for t in range(self.t_dim):
+            # Update series inputs
+            data.update({k: v[t] for k, v in series_dict.items()})
+
+            # 1-time step sample
+            samples = self.frnn.sample(data, return_all=True)
+
+            # Add samples to list
+            for k in update_value:
+                sample_dict[k].append(samples[k][None, :])
+
+            # Update
+            for key, value in update_value.items():
+                data.update({value: samples[key]})
+
+        # Concatenate sampled values
+        for key, value in sample_dict.items():
+            sample_dict[key] = torch.cat(value)
+
+        # Add sampled values to x_dict
+        data.update(sample_dict)
+
+        # Restore original values
+        data.update(series_dict)
+        data.update(updated_dict)
+
+        return self.brnn.sample(data)
+
+    def _reconstruct_one_step(self, data, **kwargs):
+
+        # Sample latent from encoder, and reconstruct observable from decoder
+        sample = self.encoder.sample(data)
+        x_t = self.decoder.sample_mean({"z": sample["z"], "d": sample["d"]})
+
+        # Update
+        data["z_prev"] = sample["z"]
+        data["d_prev"] = sample["d"]
+
+        # z_t
+        z_t = sample["z"]
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _extract_latest(self, data, **kwargs):
+
+        res_dict = {
+            "z_prev": data["z_prev"],
+            "d_prev": data["d_prev"],
+            "u": data["u"][-1],
+        }
+
+        return res_dict
