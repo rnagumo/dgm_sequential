@@ -102,6 +102,7 @@ class STORN(BaseSequentialModel):
         loss = _loss.expectation(self.irnn).mean()
 
         super().__init__(device=device, t_dim=t_dim, loss=loss,
+                         series_var=["x", "u", "h_v"],
                          distributions=distributions, **anneal_params,
                          **kwargs)
 
@@ -127,11 +128,43 @@ class STORN(BaseSequentialModel):
 
     def _sample_one_step(self, data, **kwargs):
         # Sample x_t
-        sample = (self.decoder * self.grnn * self.prior).sample(data)
+        batch_n = data["h_prev"].size(0)
+        data = self.prior.sample(data, batch_n=batch_n)
+        sample = self.grnn.sample(data)
         x_t = self.decoder.sample_mean({"h": sample["h"]})
 
         # Update h_t
         data["h_prev"] = sample["h"]
         data["u"] = x_t
 
-        return x_t[None, :], data
+        # Extract z_t
+        z_t = sample["z"]
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _inference_batch(self, data, **kwargs):
+
+        return self.irnn.sample(data)
+
+    def _reconstruct_one_step(self, data, **kwargs):
+
+        # Sample latent from encoder, and reconstruct observable from decoder
+        sample = (self.grnn * self.encoder).sample(data, return_all=False)
+        x_t = self.decoder.sample_mean({"h": sample["h"]})
+
+        # Update h_t
+        data["h_prev"] = sample["h"]
+
+        # Extract z_t
+        z_t = sample["z"]
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _extract_latest(self, data, **kwargs):
+
+        res_dict = {
+            "h_prev": data["h_prev"],
+            "u": data["u"],
+        }
+
+        return res_dict
