@@ -159,10 +159,6 @@ class BaseSequentialModel(pxm.Model):
         # Return data of size (batch_size, channel=1, seq_len, input_size)
         return x_recon[:, None], z[:, None]
 
-    def predict(self, x):
-        """Predict latent and observable at future time step."""
-        raise NotImplementedError
-
     def _init_variable(self, minibatch_size, **kwargs):
         raise NotImplementedError
 
