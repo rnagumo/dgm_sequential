@@ -82,10 +82,7 @@ class BaseSequentialModel(pxm.Model):
         x = []
         z = []
         with torch.no_grad():
-            for t in range(self.t_dim):
-                # Update t
-                data.update({"t": t})
-
+            for _ in range(self.t_dim):
                 # Sample
                 x_t, z_t, data = self._sample_one_step(data)
 
@@ -141,10 +138,7 @@ class BaseSequentialModel(pxm.Model):
         # Predict future
         data = self._extract_latest(data)
         with torch.no_grad():
-            for t in range(time_step):
-                # Update t
-                data.update({"t": t})
-
+            for _ in range(time_step):
                 # Sample
                 x_t, z_t, data = self._sample_one_step(data)
 
