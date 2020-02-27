@@ -93,9 +93,9 @@ class BaseSequentialModel(pxm.Model):
                 x.append(x_t)
                 z.append(z_t)
 
-            # Data of size (batch_size, seq_len, input_size)
-            x = torch.cat(x).transpose(0, 1)
-            z = torch.cat(z).transpose(0, 1)
+        # Data of size (batch_size, seq_len, input_size)
+        x = torch.cat(x).transpose(0, 1).cpu()
+        z = torch.cat(z).transpose(0, 1).cpu()
 
         # Return data of size (batch_size, channel=1, seq_len, input_size)
         return x[:, None], z[:, None]
