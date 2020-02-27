@@ -170,6 +170,4 @@ class DMM(BaseSequentialModel):
             "z_prev": data["z_prev"],
         }
 
-        print(res_dict["z_prev"].size())
-
         return res_dict
