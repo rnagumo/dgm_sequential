@@ -155,7 +155,7 @@ class DMM(BaseSequentialModel):
     def _reconstruct_one_step(self, data, **kwargs):
 
         # Sample latent from encoder, and reconstruct observable from decoder
-        z_dict = self.encoder.sample(data, return_all=False)
+        z_dict = self.encoder.sample(data)
         x_t = self.decoder.sample_mean(z_dict)
 
         # Update z_t

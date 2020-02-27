@@ -149,7 +149,7 @@ class STORN(BaseSequentialModel):
     def _reconstruct_one_step(self, data, **kwargs):
 
         # Sample latent from encoder, and reconstruct observable from decoder
-        sample = (self.grnn * self.encoder).sample(data, return_all=False)
+        sample = (self.grnn * self.encoder).sample(data)
         x_t = self.decoder.sample_mean({"h": sample["h"]})
 
         # Update h_t
