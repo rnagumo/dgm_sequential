@@ -6,15 +6,17 @@ import tqdm
 
 import torch
 import pixyz.models as pxm
+import pixyz.utils as pxu
 
 
 class BaseSequentialModel(pxm.Model):
-    def __init__(self, device, t_dim, anneal_epochs, min_factor,
-                 max_factor=1.0, **kwargs):
+    def __init__(self, device, t_dim, series_var, anneal_epochs, min_factor,
+                 max_factor, **kwargs):
         super().__init__(**kwargs)
 
         self.device = device
         self.t_dim = t_dim
+        self.series_var = series_var
 
         # KL annealing parameters
         self.anneal_epochs = anneal_epochs
@@ -98,9 +100,49 @@ class BaseSequentialModel(pxm.Model):
         # Return data of size (batch_size, channel=1, seq_len, input_size)
         return x[:, None], z[:, None]
 
-    def reconstruction(self, x):
+    def reconstruct(self, x):
         """Inference latent variable, and reconstruct observable."""
-        raise NotImplementedError
+
+        # Input dimension must be (timestep_size, batch_size, feature_size)
+        x = x.transpose(0, 1).to(self.device)
+        minibatch_size = x.size(1)
+
+        # Prepare data
+        data = {"x": x}
+        data.update(self._init_variable(minibatch_size, x=x))
+
+        # Batch inference
+        data = self._inference_batch(data)
+
+        # Extract time series values
+        series_dict = pxu.get_dict_values(data, self.series_var,
+                                          return_dict=True)
+
+        x_recon = []
+        z = []
+        with torch.no_grad():
+            for t in range(self.t_dim):
+                # Update time step
+                if hasattr(self, "slice_step"):
+                    # Update t value
+                    data.update({"t": t})
+                else:
+                    # Update time series variable manually
+                    data.update({k: v[t] for k, v in series_dict.items()})
+
+                # Sample observable
+                x_t, z_t, data = self._reconstruct_one_step(data)
+
+                # Add sampled values to data list
+                x_recon.append(x_t)
+                z.append(z_t)
+
+            # Data of size (batch_size, seq_len, input_size)
+            x_recon = torch.cat(x_recon).transpose(0, 1).cpu()
+            z = torch.cat(z).transpose(0, 1).cpu()
+
+        # Return data of size (batch_size, channel=1, seq_len, input_size)
+        return x_recon[:, None], z[:, None]
 
     def predict(self, x):
         """Predict latent and observable at future time step."""
@@ -110,4 +152,10 @@ class BaseSequentialModel(pxm.Model):
         raise NotImplementedError
 
     def _sample_one_step(self, data, **kwargs):
+        raise NotImplementedError
+
+    def _inference_batch(self, data, **kwargs):
+        raise NotImplementedError
+
+    def _reconstruct_one_step(self, data, **kwargs):
         raise NotImplementedError

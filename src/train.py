@@ -42,6 +42,10 @@ def train(args, logger, config):
     x_dim = train_loader.dataset.data.size(2)
     t_dim = train_loader.dataset.data.size(0)
 
+    # Sample data for reconstruction of size (batch_size, seq_len, input_size)
+    x_org, _ = iter(test_loader).next()
+    x_org = x_org[:8]
+
     # Log
     logger.info(f"Train data size: {train_loader.dataset.data.size()}")
     logger.info(f"Valid data size: {valid_loader.dataset.data.size()}")
@@ -101,6 +105,11 @@ def train(args, logger, config):
             x_sample, z_sample = model.sample()
             writer.add_images("sample/latent", z_sample, epoch)
             writer.add_images("sample/observable", x_sample, epoch)
+
+            x_sample, z_sample = model.reconstruct(x_org)
+            writer.add_images("reconstruct/original", x_org[:, None], epoch)
+            writer.add_images("reconstruct/observable", x_sample, epoch)
+            writer.add_images("reconstruct/latent", z_sample, epoch)
 
         logger.info(f"Train loss = {train_loss['loss']}")
         logger.info(f"Valid loss = {valid_loss['loss']}")

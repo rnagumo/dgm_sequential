@@ -122,9 +122,9 @@ class DMM(BaseSequentialModel):
             update_value={"z": "z_prev"})
         loss = _loss.expectation(self.rnn).mean()
 
-        super().__init__(device=device, t_dim=t_dim, loss=loss,
-                         distributions=distributions, **anneal_params,
-                         **kwargs)
+        super().__init__(device=device, t_dim=t_dim, series_var=["x", "h"],
+                         loss=loss, distributions=distributions,
+                         **anneal_params, **kwargs)
 
     def _init_variable(self, minibatch_size, **kwargs):
 
@@ -142,6 +142,24 @@ class DMM(BaseSequentialModel):
         x_t = self.decoder.sample_mean({"z": z_t})
 
         # Update z_t
+        data["z_prev"] = z_t
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _inference_batch(self, data, **kwargs):
+
+        sample = self.rnn.sample(data)
+
+        return sample
+
+    def _reconstruct_one_step(self, data, **kwargs):
+
+        # Sample latent from encoder, and reconstruct observable from decoder
+        z_dict = self.encoder.sample(data, return_all=False)
+        x_t = self.decoder.sample_mean(z_dict)
+
+        # Update z_t
+        z_t = z_dict["z"]
         data["z_prev"] = z_t
 
         return x_t[None, :], z_t[None, :], data
