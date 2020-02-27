@@ -132,8 +132,8 @@ class VRNN(BaseSequentialModel):
         loss = _loss.mean()
 
         super().__init__(device=device, t_dim=t_dim, loss=loss,
-                         distributions=distributions, **anneal_params,
-                         **kwargs)
+                         distributions=distributions, series_var=["x"],
+                         **anneal_params, **kwargs)
 
     def _init_variable(self, minibatch_size, **kwargs):
 
@@ -153,4 +153,34 @@ class VRNN(BaseSequentialModel):
         # Update h_t
         data["h_prev"] = sample["h"]
 
-        return x_t[None, :], data
+        # Extract z_t
+        z_t = sample["z"]
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _inference_batch(self, data, **kwargs):
+
+        return data
+
+    def _reconstruct_one_step(self, data, **kwargs):
+
+        # Sample latent from encoder, and reconstruct observable from decoder
+        sample = (self.encoder * self.recurrence).sample(data)
+        x_t = self.decoder.sample_mean(
+            {"z": sample["z"], "h_prev": sample["h"]})
+
+        # Update h_t
+        data["h_prev"] = sample["h"]
+
+        # Extract z_t
+        z_t = sample["z"]
+
+        return x_t[None, :], z_t[None, :], data
+
+    def _extract_latest(self, data, **kwargs):
+
+        res_dict = {
+            "h_prev": data["h_prev"],
+        }
+
+        return res_dict
