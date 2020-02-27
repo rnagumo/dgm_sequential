@@ -100,7 +100,7 @@ class BaseSequentialModel(pxm.Model):
         # Return data of size (batch_size, channel=1, seq_len, input_size)
         return x[:, None], z[:, None]
 
-    def reconstruct(self, x):
+    def reconstruct(self, x, time_step=0):
         """Inference latent variable, and reconstruct observable."""
 
         # Input dimension must be (timestep_size, batch_size, feature_size)
@@ -118,6 +118,7 @@ class BaseSequentialModel(pxm.Model):
         series_dict = pxu.get_dict_values(data, self.series_var,
                                           return_dict=True)
 
+        # Reconstruct
         x_recon = []
         z = []
         with torch.no_grad():
@@ -137,9 +138,23 @@ class BaseSequentialModel(pxm.Model):
                 x_recon.append(x_t)
                 z.append(z_t)
 
-            # Data of size (batch_size, seq_len, input_size)
-            x_recon = torch.cat(x_recon).transpose(0, 1).cpu()
-            z = torch.cat(z).transpose(0, 1).cpu()
+        # Predict future
+        data = self._extract_latest(data)
+        with torch.no_grad():
+            for t in range(time_step):
+                # Update t
+                data.update({"t": t})
+
+                # Sample
+                x_t, z_t, data = self._sample_one_step(data)
+
+                # Add to data list
+                x_recon.append(x_t)
+                z.append(z_t)
+
+        # Data of size (batch_size, seq_len, input_size)
+        x_recon = torch.cat(x_recon).transpose(0, 1).cpu()
+        z = torch.cat(z).transpose(0, 1).cpu()
 
         # Return data of size (batch_size, channel=1, seq_len, input_size)
         return x_recon[:, None], z[:, None]
@@ -158,4 +173,7 @@ class BaseSequentialModel(pxm.Model):
         raise NotImplementedError
 
     def _reconstruct_one_step(self, data, **kwargs):
+        raise NotImplementedError
+
+    def _extract_latest(self, data, **kwargs):
         raise NotImplementedError

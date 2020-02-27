@@ -163,3 +163,13 @@ class DMM(BaseSequentialModel):
         data["z_prev"] = z_t
 
         return x_t[None, :], z_t[None, :], data
+
+    def _extract_latest(self, data, **kwargs):
+
+        res_dict = {
+            "z_prev": data["z_prev"],
+        }
+
+        print(res_dict["z_prev"].size())
+
+        return res_dict

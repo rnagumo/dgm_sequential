@@ -106,7 +106,7 @@ def train(args, logger, config):
             writer.add_images("sample/latent", z_sample, epoch)
             writer.add_images("sample/observable", x_sample, epoch)
 
-            x_sample, z_sample = model.reconstruct(x_org)
+            x_sample, z_sample = model.reconstruct(x_org, time_step=10)
             writer.add_images("reconstruct/original", x_org[:, None], epoch)
             writer.add_images("reconstruct/observable", x_sample, epoch)
             writer.add_images("reconstruct/latent", z_sample, epoch)
