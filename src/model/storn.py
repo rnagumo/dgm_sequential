@@ -126,11 +126,18 @@ class STORN(BaseSequentialModel):
 
         return data
 
-    def _sample_one_step(self, data, **kwargs):
+    def _sample_one_step(self, data, reconstruct=False, **kwargs):
+
+        if reconstruct:
+            # Sample latent from encoder
+            sample = (self.grnn * self.encoder).sample(data)
+        else:
+            # Sample latent from prior
+            batch_n = data["h_prev"].size(0)
+            data = self.prior.sample(data, batch_n=batch_n)
+            sample = self.grnn.sample(data)
+
         # Sample x_t
-        batch_n = data["h_prev"].size(0)
-        data = self.prior.sample(data, batch_n=batch_n)
-        sample = self.grnn.sample(data)
         x_t = self.decoder.sample_mean({"h": sample["h"]})
 
         # Update h_t
@@ -145,20 +152,6 @@ class STORN(BaseSequentialModel):
     def _inference_batch(self, data, **kwargs):
 
         return self.irnn.sample(data)
-
-    def _reconstruct_one_step(self, data, **kwargs):
-
-        # Sample latent from encoder, and reconstruct observable from decoder
-        sample = (self.grnn * self.encoder).sample(data)
-        x_t = self.decoder.sample_mean({"h": sample["h"]})
-
-        # Update h_t
-        data["h_prev"] = sample["h"]
-
-        # Extract z_t
-        z_t = sample["z"]
-
-        return x_t[None, :], z_t[None, :], data
 
     def _extract_latest(self, data, **kwargs):
 

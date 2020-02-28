@@ -134,14 +134,20 @@ class DMM(BaseSequentialModel):
 
         return data
 
-    def _sample_one_step(self, data, **kwargs):
+    def _sample_one_step(self, data, reconstruct=False, **kwargs):
 
-        # Sample z_t and x_t
-        z_dict = self.prior.sample(data, return_all=False)
-        x_t = self.decoder.sample_mean(z_dict)
+        if reconstruct:
+            # Sample latent from encoder
+            sample = self.encoder.sample(data)
+        else:
+            # Sample latent from prior
+            sample = self.prior.sample(data)
+
+        # Sample z_t
+        x_t = self.decoder.sample_mean({"z": sample["z"]})
 
         # Update z_t
-        z_t = z_dict["z"]
+        z_t = sample["z"]
         data["z_prev"] = z_t
 
         return x_t[None, :], z_t[None, :], data
@@ -151,18 +157,6 @@ class DMM(BaseSequentialModel):
         sample = self.rnn.sample(data)
 
         return sample
-
-    def _reconstruct_one_step(self, data, **kwargs):
-
-        # Sample latent from encoder, and reconstruct observable from decoder
-        z_dict = self.encoder.sample(data)
-        x_t = self.decoder.sample_mean(z_dict)
-
-        # Update z_t
-        z_t = z_dict["z"]
-        data["z_prev"] = z_t
-
-        return x_t[None, :], z_t[None, :], data
 
     def _extract_latest(self, data, **kwargs):
 

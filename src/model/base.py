@@ -129,7 +129,7 @@ class BaseSequentialModel(pxm.Model):
                     data.update({k: v[t] for k, v in series_dict.items()})
 
                 # Sample observable
-                x_t, z_t, data = self._reconstruct_one_step(data)
+                x_t, z_t, data = self._sample_one_step(data, reconstruct=True)
 
                 # Add sampled values to data list
                 x_recon.append(x_t)
@@ -156,13 +156,10 @@ class BaseSequentialModel(pxm.Model):
     def _init_variable(self, minibatch_size, **kwargs):
         raise NotImplementedError
 
-    def _sample_one_step(self, data, **kwargs):
+    def _sample_one_step(self, data, reconstruct=False, **kwargs):
         raise NotImplementedError
 
     def _inference_batch(self, data, **kwargs):
-        raise NotImplementedError
-
-    def _reconstruct_one_step(self, data, **kwargs):
         raise NotImplementedError
 
     def _extract_latest(self, data, **kwargs):

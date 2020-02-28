@@ -122,12 +122,11 @@ class VRNN(BaseSequentialModel):
                          self.recurrence]
 
         # Loss
-        recon = pxl.StochasticReconstructionLoss(
-            self.encoder * self.recurrence, self.decoder)
+        ce = pxl.CrossEntropy(self.encoder * self.recurrence, self.decoder)
         kl = pxl.KullbackLeibler(self.encoder, self.prior)
         beta = pxl.Parameter("beta")
         _loss = MonitoredIterativeLoss(
-            recon, kl, beta, max_iter=t_dim, series_var=["x"],
+            ce, kl, beta, max_iter=t_dim, series_var=["x"],
             update_value={"h": "h_prev"})
         loss = _loss.mean()
 
@@ -143,12 +142,18 @@ class VRNN(BaseSequentialModel):
 
         return data
 
-    def _sample_one_step(self, data, **kwargs):
+    def _sample_one_step(self, data, reconstruct=False, **kwargs):
+
+        if reconstruct:
+            # Sample latent from encoder
+            sample = (self.encoder * self.recurrence).sample(data)
+        else:
+            # Sample latent from prior
+            sample = (self.prior * self.decoder * self.recurrence).sample(data)
 
         # Sample x_t
-        sample = (self.prior * self.decoder * self.recurrence).sample(data)
-        x_t = self.decoder.sample_mean(
-            {"z": sample["z"], "h_prev": sample["h"]})
+        x_t = self.decoder.sample_mean({"z": sample["z"],
+                                        "h_prev": sample["h"]})
 
         # Update h_t
         data["h_prev"] = sample["h"]
@@ -161,21 +166,6 @@ class VRNN(BaseSequentialModel):
     def _inference_batch(self, data, **kwargs):
 
         return data
-
-    def _reconstruct_one_step(self, data, **kwargs):
-
-        # Sample latent from encoder, and reconstruct observable from decoder
-        sample = (self.encoder * self.recurrence).sample(data)
-        x_t = self.decoder.sample_mean(
-            {"z": sample["z"], "h_prev": sample["h"]})
-
-        # Update h_t
-        data["h_prev"] = sample["h"]
-
-        # Extract z_t
-        z_t = sample["z"]
-
-        return x_t[None, :], z_t[None, :], data
 
     def _extract_latest(self, data, **kwargs):
 

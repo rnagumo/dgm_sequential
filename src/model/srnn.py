@@ -162,15 +162,25 @@ class SRNN(BaseSequentialModel):
 
         return data
 
-    def _sample_one_step(self, data, **kwargs):
+    def _sample_one_step(self, data, reconstruct=False, **kwargs):
+
+        if reconstruct:
+            # Sample latent from encoder
+            sample = self.encoder.sample(data)
+        else:
+            # Sample latent from prior
+            sample = (self.prior * self.frnn * self.decoder).sample(data)
+
         # Sample x_t
-        sample = (self.prior * self.frnn * self.decoder).sample(data)
         x_t = self.decoder.sample_mean({"z": sample["z"], "d": sample["d"]})
 
-        # Update
+        # Update latent
         data["z_prev"] = sample["z"]
         data["d_prev"] = sample["d"]
-        data["u"] = x_t
+
+        # Update inputs
+        if not reconstruct:
+            data["u"] = x_t
 
         # z_t
         z_t = sample["z"]
@@ -219,21 +229,6 @@ class SRNN(BaseSequentialModel):
         data.update(updated_dict)
 
         return self.brnn.sample(data)
-
-    def _reconstruct_one_step(self, data, **kwargs):
-
-        # Sample latent from encoder, and reconstruct observable from decoder
-        sample = self.encoder.sample(data)
-        x_t = self.decoder.sample_mean({"z": sample["z"], "d": sample["d"]})
-
-        # Update
-        data["z_prev"] = sample["z"]
-        data["d_prev"] = sample["d"]
-
-        # z_t
-        z_t = sample["z"]
-
-        return x_t[None, :], z_t[None, :], data
 
     def _extract_latest(self, data, **kwargs):
 
