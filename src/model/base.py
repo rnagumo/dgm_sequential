@@ -1,9 +1,6 @@
 
 """Base class for deep sequential model"""
 
-
-import tqdm
-
 import torch
 import pixyz.models as pxm
 import pixyz.utils as pxu
@@ -38,7 +35,7 @@ class BaseSequentialModel(pxm.Model):
         results = []
 
         # Train with mini-batch
-        for x, seq_len in tqdm.tqdm(loader):
+        for x, seq_len in loader:
             # Input dimension must be (timestep_size, batch_size, feature_size)
             x = x.transpose(0, 1).to(self.device)
             minibatch_size = x.size(1)
