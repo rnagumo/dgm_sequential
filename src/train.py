@@ -2,13 +2,15 @@
 """Training method"""
 
 import argparse
+import datetime
 import pathlib
 
 import torch
-from torch.utils import tensorboard
+import tensorboardX as tb
 
-from dataset.polydata import init_poly_dataloader
-from utils.utils import init_logger, load_config, check_logdir
+import dgm_sequential.dataset as dsd
+import dgm_sequential.model as dsm
+import dgm_sequential.utils as dsu
 
 
 def train(args, logger, config):
@@ -26,16 +28,21 @@ def train(args, logger, config):
     torch.manual_seed(args.seed)
 
     # Tensorboard writer
-    writer = tensorboard.SummaryWriter(args.logdir)
+    writer = tb.SummaryWriter(args.logdir)
+
+    # Timer
+    timer = datetime.datetime.now()
 
     # -------------------------------------------------------------------------
     # 2. Data
     # -------------------------------------------------------------------------
 
+    logger.info("Prepare data")
+
     # Loader
     batch_size = args.batch_size
     path = pathlib.Path(args.root, args.filename)
-    train_loader, valid_loader, test_loader = init_poly_dataloader(
+    train_loader, valid_loader, test_loader = dsd.init_poly_dataloader(
         path, use_cuda, batch_size)
 
     # Data dimension (seq_len, batch_size, input_size)
@@ -60,22 +67,17 @@ def train(args, logger, config):
               "optimizer_params": config["optimizer_params"]}
 
     if args.model == "dmm":
-        from model.dmm import DMM
-        model = DMM(**config["dmm_params"], **params)
+        model = dsm.DMM(**config["dmm_params"], **params)
     elif args.model == "srnn":
-        from model.srnn import SRNN
-        model = SRNN(**config["srnn_params"], **params)
+        model = dsm.SRNN(**config["srnn_params"], **params)
     elif args.model == "storn":
-        from model.storn import STORN
-        model = STORN(**config["storn_params"], **params)
+        model = dsm.STORN(**config["storn_params"], **params)
     elif args.model == "vrnn":
-        from model.vrnn import VRNN
-        model = VRNN(**config["vrnn_params"], **params)
+        model = dsm.VRNN(**config["vrnn_params"], **params)
     elif args.model == "tdvae":
-        from model.tdvae import TDVAE
-        model = TDVAE(**config["tdvae_params"], **params)
+        model = dsm.TDVAE(**config["tdvae_params"], **params)
     else:
-        raise KeyError
+        raise KeyError(f"Not implemented model is specified, {args.model}")
 
     # -------------------------------------------------------------------------
     # 4. Training
@@ -89,19 +91,19 @@ def train(args, logger, config):
         valid_loss = model.run(valid_loader, epoch, training=False)
         test_loss = model.run(test_loader, epoch, training=False)
 
+        logger.info(f"Train loss = {train_loss['loss']}")
+        logger.info(f"Valid loss = {valid_loss['loss']}")
+        logger.info(f"Test loss = {test_loss['loss']}")
+
         # Log
-        writer.add_scalar("loss/train_loss", train_loss["loss"], epoch)
-        writer.add_scalar("loss/valid_loss", valid_loss["loss"], epoch)
-        writer.add_scalar("loss/test_loss", test_loss["loss"], epoch)
-        writer.add_scalar("training/beta",
-                          train_loss["beta"], epoch)
-        writer.add_scalar("training/cross_entropy",
-                          train_loss["cross_entropy"], epoch)
-        writer.add_scalar("training/kl_divergence",
-                          train_loss["kl_divergence"], epoch)
+        for mode, dicts in zip(["train", "valid", "test"],
+                               [train_loss, valid_loss, test_loss]):
+            for key, value in dicts.items():
+                writer.add_scalar(f"{mode}/{key}", value, epoch)
 
         # Sample data
         if epoch % args.plot_interval == 0:
+            logger.info("Sample data")
             x_sample, z_sample = model.sample()
             writer.add_images("sample/latent", z_sample, epoch)
             writer.add_images("sample/observable", x_sample, epoch)
@@ -111,9 +113,14 @@ def train(args, logger, config):
             writer.add_images("reconstruct/observable", x_sample, epoch)
             writer.add_images("reconstruct/latent", z_sample, epoch)
 
-        logger.info(f"Train loss = {train_loss['loss']}")
-        logger.info(f"Valid loss = {valid_loss['loss']}")
-        logger.info(f"Test loss = {test_loss['loss']}")
+        # Save model
+        if epoch % args.save_interval == 0:
+            logger.info(f"Save model at epoch {epoch}")
+            t = timer.strftime("%Y%m%d%H%M%S")
+            filename = f"{args.model}_{t}_epoch_{epoch}.pt"
+            torch.save({"distributions_dict": model.distributions.state_dict(),
+                        "optimizer_dict": model.optimizer.state_dict()},
+                       pathlib.Path(args.logdir, filename))
 
     # Log hyper-parameters
     hparam_dict = vars(args)
@@ -142,6 +149,7 @@ def init_args():
     parser.add_argument("--batch-size", type=int, default=20)
     parser.add_argument("--epochs", type=int, default=5)
     parser.add_argument("--plot-interval", type=int, default=100)
+    parser.add_argument("--save-interval", type=int, default=100)
 
     return parser.parse_args()
 
@@ -151,15 +159,15 @@ def main():
     args = init_args()
 
     # Make logdir
-    check_logdir(args.logdir)
+    dsu.check_logdir(args.logdir)
 
     # Logger
-    logger = init_logger(args.logdir)
+    logger = dsu.init_logger(args.logdir)
     logger.info("Start logger")
     logger.info(f"Commant line args: {args}")
 
     # Config
-    config = load_config(args.config)
+    config = dsu.load_config(args.config)
     logger.info(f"Configs: {config}")
 
     try:
