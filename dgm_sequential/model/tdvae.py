@@ -16,7 +16,7 @@ from torch.nn import functional as F
 import pixyz.distributions as pxd
 import pixyz.losses as pxl
 
-from .iteration_loss import MonitoredIterativeLoss
+from ..loss.iteration_loss import MonitoredIterativeLoss
 from .base import BaseSequentialModel
 
 

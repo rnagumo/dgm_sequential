@@ -14,8 +14,8 @@ import pixyz.distributions as pxd
 import pixyz.losses as pxl
 import pixyz.utils as pxu
 
-from .iteration_loss import MonitoredIterativeLoss
-from .time_expectation import TimeSeriesExpectation
+from ..loss.iteration_loss import MonitoredIterativeLoss
+from ..loss.time_expectation import TimeSeriesExpectation
 from .base import BaseSequentialModel
 
 
